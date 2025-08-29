@@ -22,7 +22,7 @@ def extract_ref_seq(ref_fasta, chrom, start, end):
     return seq
 
 
-def vcf_to_consensus(seq, vcf, chrom, start, end, plink_vcf=False):
+def vcf_to_consensus(seq, vcf, chrom, start, end, sample_list, plink_vcf=False):
     """create dictionary of the consensus sequences using vcf and ref seq:{"sample1":{10:"A",20:"T},"sample2":{10:"A",20:"G"}}"""
 
     seq_dict = {}
@@ -30,7 +30,8 @@ def vcf_to_consensus(seq, vcf, chrom, start, end, plink_vcf=False):
     for i, v in enumerate(list(range(start - 1, end))):
         seq_dict[v + 1] = seq[i].capitalize()
     vcf_in = pysam.VariantFile(vcf)
-    sample_list = list(vcf_in.header.samples)
+    if len(sample_list) == 0:
+        sample_list = list(vcf_in.header.samples)
     # Dictionary mapping heterozygous genotypes to IUPAC codes (without "/")
     heterozygous_to_iupac = {
         "AG": "R",  # purine
@@ -100,6 +101,7 @@ def main():
     parser.add_argument("-c", "--chrom", required=True, help="chromosome name")
     parser.add_argument("-s", "--start", required=True, help="start coordinates")
     parser.add_argument("-e", "--end", required=True, help="end coordinates")
+    parser.add_argument("-S", "--sample_list", required=False, default=None, help="chromosome name")
     parser.add_argument(
         "-o", "--output", required=False, default="output.fa", help="output_file"
     )
@@ -109,6 +111,14 @@ def main():
 
     args = parser.parse_args()
 
+    sample_list = []
+    if args.sample_list:
+        with open(args.sample_list) as source:
+            for line in source:
+                line = line.rstrip().split()
+                sample_list.append(line[0])
+
+
     seq = extract_ref_seq(args.ref_fasta, args.chrom, int(args.start), int(args.end))
     sample_seq_dict = vcf_to_consensus(
         seq,
@@ -116,6 +126,7 @@ def main():
         args.chrom,
         int(args.start),
         int(args.end),
+        sample_list,
         plink_vcf=args.plink_vcf,
     )
     if args.output == "output.fa":
